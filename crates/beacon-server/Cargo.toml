@@ -1,0 +1,26 @@
+[package]
+name = "beacon-server"
+description = "Main API server for TPT Beacon (Axum)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+tokio.workspace = true
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+beacon-semantic = { path = "../beacon-semantic" }
+beacon-keystone-client = { path = "../beacon-keystone-client" }
+beacon-anvil-client = { path = "../beacon-anvil-client" }
+
+[dev-dependencies]

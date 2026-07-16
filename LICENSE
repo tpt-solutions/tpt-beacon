@@ -1,0 +1,26 @@
+TPT Beacon — Dual License
+========================
+
+TPT Beacon is dual licensed under either of:
+
+  * MIT License (see `LICENSE-MIT`)
+  * Apache License, Version 2.0 (see `LICENSE-APACHE`)
+
+at your option.
+
+This dual-licensing model gives you the freedom to choose the license that
+best fits your use case:
+
+  * The MIT License is short, permissive, and familiar — ideal for embedding
+    Beacon into other projects with minimal obligations.
+  * The Apache License 2.0 additionally provides an explicit patent grant and
+    contributor protection, which is often preferred for larger organizational
+    adoption and redistribution.
+
+You may use, modify, and distribute TPT Beacon under the terms of either
+license. Where the two licenses differ, you may pick whichever is more
+favorable to you for a given purpose.
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+
+Copyright TPT Solutions.

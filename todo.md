@@ -8,25 +8,25 @@
 
 ## Phase 0 — Repo & Workspace Setup
 
-- [ ] `git init` and push to GitHub (`tpt-solutions/tpt-beacon`)
-- [ ] Add dual license files: `LICENSE-MIT` and `LICENSE-APACHE`
-- [ ] Add `LICENSE` root file explaining dual-license choice
-- [ ] Write initial `README.md` (project overview, status: pre-alpha, self-hosted single-tenant architecture summary)
-- [ ] Add `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`
-- [ ] Add `.gitignore` (Rust, Node.js, IDE files)
-- [ ] Create monorepo scaffold:
+- [x] `git init` and push to GitHub (`tpt-solutions/tpt-beacon`)
+- [x] Add dual license files: `LICENSE-MIT` and `LICENSE-APACHE`
+- [x] Add `LICENSE` root file explaining dual-license choice
+- [x] Write initial `README.md` (project overview, status: pre-alpha, self-hosted single-tenant architecture summary)
+- [x] Add `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`
+- [x] Add `.gitignore` (Rust, Node.js, IDE files)
+- [x] Create monorepo scaffold:
   - `crates/beacon-server` — main API server (Axum)
   - `crates/beacon-semantic` — semantic layer / metrics / query-builder compiler
   - `crates/beacon-keystone-client` — thin wrapper over `tpt-sdk` for Keystone access
   - `crates/beacon-anvil-client` — JSON-RPC client for `anvil-daemon`
   - `apps/web` — React + TypeScript frontend (query builder, dashboards, viz)
   - `docs/` — architecture and user documentation
-- [ ] Initialize root `Cargo.toml` workspace
-- [ ] Initialize root `package.json` workspace (npm/pnpm) for `apps/web`
-- [ ] Configure `rustfmt.toml` + clippy lint rules; ESLint + Prettier + `tsconfig.json` for `apps/web`
-- [ ] GitHub Actions CI: Rust job (build+test+clippy across workspace), frontend job (lint+typecheck+build+test)
-- [ ] Add GitHub issue templates (bug report, feature request) and PR template
-- [ ] `docker-compose.yml` for local dev (Beacon server + Keystone + optional Anvil daemon)
+- [x] Initialize root `Cargo.toml` workspace
+- [x] Initialize root `package.json` workspace (npm/pnpm) for `apps/web`
+- [x] Configure `rustfmt.toml` + clippy lint rules; ESLint + Prettier + `tsconfig.json` for `apps/web`
+- [x] GitHub Actions CI: Rust job (build+test+clippy across workspace), frontend job (lint+typecheck+build+test)
+- [x] Add GitHub issue templates (bug report, feature request) and PR template
+- [x] `docker-compose.yml` for local dev (Beacon server + Keystone + optional Anvil daemon)
 
 ---
 

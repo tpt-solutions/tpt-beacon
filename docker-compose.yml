@@ -1,0 +1,48 @@
+# Local development environment for TPT Beacon.
+#
+# Brings up the Beacon API server, a TPT Keystone instance, and (optionally)
+# the Anvil daemon. Volumes are kept out of the repo (see .gitignore:
+# tpt-data/ and beacon-data/).
+
+services:
+  keystone:
+    image: tptsolutions/keystone:latest
+    environment:
+      KEYSTONE_USER: keystone
+      KEYSTONE_PASSWORD: keystone
+      KEYSTONE_DB: keystone
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./tpt-data:/var/lib/keystone
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "keystone"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  beacon-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      keystone:
+        condition: service_healthy
+    environment:
+      KEYSTONE_HOST: keystone
+      KEYSTONE_PORT: "5432"
+      KEYSTONE_DATABASE: keystone
+      KEYSTONE_USER: keystone
+      KEYSTONE_PASSWORD: keystone
+      ANVIL_SOCKET: ""
+      RUST_LOG: info
+    ports:
+      - "3000:3000"
+
+  # Optional: uncomment to enable the AI layer (Phase 7).
+  # anvil-daemon:
+  #   image: tptsolutions/anvil:latest
+  #   volumes:
+  #     - ./beacon-data/anvil.sock:/run/anvil/anvil.sock
+  #   ports:
+  #     - "7431:7431"

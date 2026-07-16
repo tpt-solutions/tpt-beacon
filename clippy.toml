@@ -1,0 +1,3 @@
+# clippy.toml — clippy lint configuration values.
+# Lint *rules* are configured via [workspace.lints.clippy] in Cargo.toml.
+# See https://doc.rust-lang.org/clippy/configuration.html for supported keys.

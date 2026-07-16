@@ -1,0 +1,11 @@
+TPT Beacon (Business Intelligence & Analytics)
+The "Tableau/Looker Killer"
+Business intelligence and analytics is dominated by expensive commercial tools: Tableau ($70/user/month), Looker (Google, custom pricing), Power BI (Microsoft, per-user licensing). These tools are essential for data-driven decision making but are prohibitively expensive for most organizations. Open-source alternatives (Metabase, Superset) exist but lack the polish, performance, and advanced features of commercial tools.
+TPT Beacon is a next-generation BI platform built specifically to leverage TPT Keystone's multi-model capabilities. It provides a beautiful, intuitive drag-and-drop query builder, native support for all 7 Keystone data models (relational, geospatial, vector, time-series, graph, document, streaming), real-time dashboards powered by TPT Flux event streaming, an advanced visualization library (maps, charts, graphs, custom D3-style visualizations), embedded analytics (white-label dashboards for customer-facing apps), and AI-powered query suggestions and natural language querying via TPT Anvil integration.
+By releasing TPT Beacon under the Apache 2.0 license, we democratize business intelligence. Data-driven decision making shouldn't require $70/user/month licensing. Beacon illuminates the path forward, guiding organizations through their data with clarity and precision, completely free of charge.
+Tech Stack:
+Core Engine: Rust for high-performance query execution
+Query Builder: React with TypeScript for intuitive UI
+Visualization: D3.js and WebGL for advanced, custom visualizations
+Real-Time: Native TPT Flux integration for live dashboards
+AI Layer: Local LLM integration for natural language querying (via TPT Anvil)

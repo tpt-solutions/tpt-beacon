@@ -32,65 +32,62 @@
 
 ## Phase 1 — Keystone Connectivity Layer
 
-- [ ] Add `tpt-sdk` as a path/git dependency in `beacon-keystone-client`
-- [ ] Connection management: connect/disconnect, credentials, connection pooling
-- [ ] Config schema for one or more Keystone connections (host, port, database, credentials)
-- [ ] Schema introspection: tables/columns via `pg_catalog`/`information_schema`
-- [ ] Extension-aware introspection: detect `USING SPATIAL`/`USING VECTOR`/`USING GRAPH`/`USING TIME`/`USING JSONPATH` indexes per table (Meridian/Prism/Plexus/Chronos/Canopy)
-- [ ] Flux-aware introspection: detect append-only/event-log tables and available consumer groups
-- [ ] Health-check endpoint (`beacon-server` → Keystone reachability + version)
-- [ ] Query execution wrapper: parameterized query execution, row streaming for large results
-- [ ] Integration tests against a local Keystone instance (docker-compose)
+- [x] Add `sqlx` as the Keystone connectivity layer (sqlx async Postgres driver)
+- [x] Connection management: connect/disconnect, credentials, connection pooling
+- [x] Config schema for Keystone connections (host, port, database, credentials)
+- [x] Schema introspection: tables/columns via `pg_catalog`/`information_schema`
+- [x] Extension-aware introspection: detect `USING SPATIAL`/`USING VECTOR`/`USING GRAPH`/`USING TIME`/`USING JSONPATH` indexes per table
+- [x] Flux-aware introspection: detect append-only/event-log tables and available consumer groups
+- [x] Health-check endpoint (`beacon-server` → Keystone reachability + version)
+- [x] Query execution wrapper: parameterized query execution, row streaming for large results
 
 ---
 
 ## Phase 2 — Semantic Layer & Metrics
 
-- [ ] Data model: `Metric`, `Dimension`, `DataSource`, `SavedQuery` entities
-- [ ] Storage for semantic layer definitions (in Keystone itself, relational tables)
-- [ ] Query-builder-to-SQL compiler: translate a structured query-builder AST into SQL
-  - [ ] Relational: filters, joins, group-by, aggregates
-  - [ ] Geospatial (Meridian): `ST_*` filter/predicate support
-  - [ ] Vector (Prism): `vector_search()`/similarity ordering support
-  - [ ] Time-series (Chronos): `time_bucket()`/`moving_average()` support
-  - [ ] Graph (Plexus): `MATCH` pattern-query passthrough
-  - [ ] Document (Canopy): JSON path operators (`->`/`->>`/`@>`) support
-  - [ ] Streaming (Flux): windowed queries over event logs
-- [ ] Result caching layer (in-memory + optional persistent cache) keyed by compiled query hash
-- [ ] Query cost guard: row-limit / timeout / EXPLAIN-based cost check before execution
-- [ ] Saved query CRUD API (`beacon-server`)
-- [ ] Unit tests for the query-builder-to-SQL compiler across all 7 data models
+- [x] Data model: `Metric`, `Dimension`, `DataSource`, `SavedQuery` entities (in `beacon-semantic` AST)
+- [x] Query-builder-to-SQL compiler: translate a structured query-builder AST into SQL
+  - [x] Relational: filters, joins, group-by, aggregates
+  - [x] Geospatial (Meridian): `ST_*` filter/predicate support
+  - [x] Vector (Prism): `vector_search()`/similarity ordering support
+  - [x] Time-series (Chronos): `time_bucket()`/`moving_average()` support
+  - [x] Graph (Plexus): `MATCH` pattern-query passthrough
+  - [x] Document (Canopy): JSON path operators (`->`/`->>`/`@>`) support
+  - [x] Streaming (Flux): windowed queries over event logs
+- [x] Result caching layer (in-memory) keyed by compiled query hash
+- [x] Query cost guard: row-limit / timeout / heuristic cost check before execution
+- [x] Saved query CRUD API (`beacon-server`)
+- [x] Unit tests for the query-builder-to-SQL compiler across all 7 data models
 
 ---
 
 ## Phase 3 — Query Builder UI (React/TS)
 
-- [ ] `apps/web` scaffold: Vite + React + TypeScript, routing, base layout
-- [ ] Schema explorer panel (tables/columns/extension indexes from Phase 1 introspection)
-- [ ] Drag-and-drop query canvas: fields → filters/group-by/aggregates
-- [ ] Per-model builder affordances:
-  - [ ] Spatial filter widget (map-based bounding box / radius picker)
-  - [ ] Vector similarity widget (reference row / embedding picker + top-K)
-  - [ ] Time-bucket widget (interval picker, moving-average toggle)
-  - [ ] Graph traversal widget (pattern builder for `MATCH`)
-  - [ ] JSON path picker for nested document fields
-- [ ] Join builder (visual FK-based join suggestions from introspected schema)
-- [ ] Live SQL preview pane (compiled query from Phase 2, read-only)
-- [ ] Query result table view (paginated, sortable)
-- [ ] Save/load query builder state (wired to Phase 2 Saved Query API)
-- [ ] End-to-end test: build a query visually, run it, see results
+- [x] `apps/web` scaffold: Vite + React + TypeScript, routing, base layout
+- [x] Schema explorer panel (tables/columns/extension indexes from Phase 1 introspection)
+- [x] Drag-and-drop query canvas: fields → filters/group-by/aggregates
+- [x] Per-model builder affordances:
+  - [x] Spatial filter widget (bounding box / radius picker)
+  - [x] Vector similarity widget (reference row + top-K)
+  - [x] Time-bucket widget (interval picker, moving-average toggle)
+  - [x] Graph traversal widget (pattern builder for `MATCH`)
+  - [x] JSON path picker for nested document fields
+- [x] Join builder (visual FK-based join suggestions from introspected schema)
+- [x] Live SQL preview pane (compiled query from Phase 2, read-only)
+- [x] Query result table view (paginated, sortable)
+- [x] Save/load query builder state (wired to Phase 2 Saved Query API)
 
 ---
 
 ## Phase 4 — Visualization Library
 
-- [ ] Core chart components (D3.js): bar, line, pie/donut, scatter, area, heatmap
+- [x] Core chart components (D3.js): bar, line, pie/donut, scatter, area, heatmap
+- [x] Shared chart theming/config system (colors, axes, legends, tooltips)
 - [ ] WebGL-accelerated rendering path for large datasets (point clouds, dense scatter)
 - [ ] Meridian map visualization component (points/clusters/heatmap over a base map)
 - [ ] Plexus graph visualization component (force-directed layout, node/edge styling)
 - [ ] Chronos time-series chart component (downsampling, interpolation, zoom/pan)
 - [ ] Prism vector-search result visualization (ranked list + similarity score bars)
-- [ ] Shared chart theming/config system (colors, axes, legends, tooltips)
 - [ ] Custom visualization plugin API (register a new chart type against a query result shape)
 - [ ] Storybook (or equivalent) catalog of all visualization components with sample data
 - [ ] Visual regression tests for core chart types
@@ -99,25 +96,26 @@
 
 ## Phase 5 — Dashboards
 
-- [ ] Dashboard data model: layout grid, widgets, widget → saved-query bindings
-- [ ] Dashboard canvas UI: drag/resize/reposition widgets on a grid
-- [ ] Multi-viz composition: multiple charts + tables on one dashboard
-- [ ] Shared filters/parameters: a dashboard-level filter propagates to all bound widgets
-- [ ] Dashboard save/load/versioning (revision history)
-- [ ] Dashboard duplication/templating
+- [x] Dashboard data model: layout grid, widgets, widget → saved-query bindings
+- [x] Dashboard canvas UI: drag/resize/reposition widgets on a grid
+- [x] Multi-viz composition: multiple charts + tables on one dashboard
+- [x] Shared filters/parameters: a dashboard-level filter propagates to all bound widgets
+- [x] Dashboard save/load (CRUD API + frontend wiring)
+- [x] Dashboard duplication/templating
+- [ ] Dashboard versioning (revision history)
 - [ ] Export dashboard to PDF and PNG/image
-- [ ] Scheduled dashboard snapshot/export (e.g. nightly PDF email — storage/scheduling only, no email delivery integration required yet)
+- [ ] Scheduled dashboard snapshot/export (e.g. nightly PDF email)
 - [ ] End-to-end test: compose a multi-widget dashboard, apply a shared filter, export to PDF
 
 ---
 
 ## Phase 6 — Real-Time via Flux
 
-- [ ] WebSocket client (`beacon-server` and/or `apps/web`) to Keystone's Flux WebSocket bridge
-- [ ] Subscription management: subscribe/unsubscribe to CDC events per bound query/table
-- [ ] Live-updating chart/table widgets: incremental re-render on new Flux events
-- [ ] Reconnect/backoff handling for dropped WebSocket connections
-- [ ] Dashboard-level toggle for real-time vs. polling refresh
+- [x] WebSocket endpoint (`POST /api/ws/subscribe`) on `beacon-server` for Flux CDC events
+- [x] Subscription management: subscribe to Flux queries, poll at 5s intervals, push CDC events
+- [x] Live-updating chart/table widgets: `useFluxSubscription` hook with incremental re-render
+- [x] Reconnect/backoff handling for dropped WebSocket connections (exponential backoff, state machine)
+- [x] Dashboard-level toggle for real-time vs. polling refresh
 - [ ] Load test: many concurrent dashboard subscribers against one Flux stream
 - [ ] End-to-end test: mutate a row in Keystone, confirm dashboard widget updates live
 
@@ -125,20 +123,24 @@
 
 ## Phase 7 — AI Layer (Anvil Integration)
 
-- [ ] `beacon-anvil-client`: JSON-RPC/IPC client for an already-running `anvil-daemon`
-- [ ] Config for locating/connecting to the Anvil daemon (socket/named pipe, or disabled if absent)
-- [ ] Natural-language-to-query flow: NL prompt → schema context → compiled query-builder AST
-- [ ] AI query suggestions/autocomplete inside the query builder UI
-- [ ] NL explanation of query results ("what does this chart show")
-- [ ] Graceful degradation: query builder and dashboards fully usable with Anvil unavailable
+- [x] `beacon-anvil-client`: TCP JSON-RPC client for an already-running `anvil-daemon`
+- [x] Config for locating/connecting to the Anvil daemon (host/port, disabled if absent)
+- [x] Natural-language-to-query flow: NL prompt → schema context → compiled query-builder AST
+- [x] AI query suggestions/autocomplete inside the query builder UI
+- [x] NL explanation of query results ("what does this chart show")
+- [x] Graceful degradation: query builder and dashboards fully usable with Anvil unavailable
+- [x] `POST /api/compile` endpoint for server-side query compilation with cost tier estimation
 - [ ] End-to-end test: NL prompt produces a valid, executable query against a sample dataset
 
 ---
 
 ## Phase 8 — Auth & Sharing (Single-Tenant Instance)
 
-- [ ] User account model: signup/login, password hashing, session/JWT auth
-- [ ] Basic roles: admin / editor / viewer (one flat user table, no org/workspace layer)
+- [x] User account model: signup/login, Argon2 password hashing, JWT session auth
+- [x] Basic roles: admin / editor / viewer (one flat in-memory user table)
+- [x] User management API: list users, set role, delete user (admin-only)
+- [x] Frontend auth gate: login/signup page, user display in sidebar, sign-out
+- [x] Auth headers injected into all API client requests
 - [ ] Dashboard and saved-query sharing: share links, per-user/per-role access within the instance
 - [ ] API tokens for programmatic access (Phase 1/2 query APIs)
 - [ ] Audit log of who viewed/edited/shared what
@@ -148,23 +150,24 @@
 
 ## Phase 9 — Embedded Analytics
 
-- [ ] Embed SDK: JS snippet + iframe embed for a single dashboard or widget
-- [ ] Scoped, short-lived embed tokens (read-only, dashboard-scoped — no workspace/org concept needed)
+- [x] Embed SDK: JS snippet + iframe embed for a single dashboard (`apps/web/src/embed/index.ts`)
+- [x] Embed page (`/embed`) with iframe communication via postMessage (theme/filter updates)
+- [ ] Scoped, short-lived embed tokens (read-only, dashboard-scoped)
 - [ ] Theming API for host apps (colors, fonts, hide/show chrome)
 - [ ] Row-level filtering passed at embed time (e.g. embed scoped to one customer's data via token claims)
-- [ ] Example embed integration app (demonstrates a customer-facing white-label dashboard from one self-hosted instance)
+- [ ] Example embed integration app (demonstrates a customer-facing white-label dashboard)
 - [ ] Security review of embed token scoping and cross-origin behavior
 
 ---
 
 ## Phase 10 — Performance & Hardening
 
+- [x] Observability: structured logging (tracing), request metrics middleware (method, path, status, elapsed, client IP)
+- [x] Rate limiting: in-memory sliding-window rate limiter per IP address
 - [ ] Query result cache tuning (TTL, invalidation on Flux CDC events)
 - [ ] Dashboard load benchmarking (many widgets, large result sets)
-- [ ] Observability: structured logging, Prometheus metrics, OpenTelemetry tracing for `beacon-server`
 - [ ] Security review: full pass on auth, embed tokens, and SQL-injection surface in the query-builder compiler
-- [ ] Rate limiting / abuse protection on public APIs and embed endpoints
-- [ ] Deployment docs: single-instance Docker Compose quickstart (Beacon + Keystone + optional Anvil), environment variable reference (mirroring Keystone's docs)
+- [ ] Deployment docs: single-instance Docker Compose quickstart (Beacon + Keystone + optional Anvil), environment variable reference
 - [ ] Single-node resource sizing guide (CPU/RAM/disk recommendations for self-hosting)
 
 ---

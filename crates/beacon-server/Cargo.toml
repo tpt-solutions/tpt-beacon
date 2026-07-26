@@ -19,6 +19,16 @@ serde_json.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 anyhow.workspace = true
+futures-util = "0.3"
+tokio-tungstenite = "0.24"
+sqlx.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+argon2.workspace = true
+jsonwebtoken.workspace = true
+base64.workspace = true
+sha2.workspace = true
+tower-http = { version = "0.6", features = ["cors", "trace"] }
 beacon-semantic = { path = "../beacon-semantic" }
 beacon-keystone-client = { path = "../beacon-keystone-client" }
 beacon-anvil-client = { path = "../beacon-anvil-client" }

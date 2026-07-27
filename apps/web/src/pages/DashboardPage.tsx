@@ -1,8 +1,13 @@
-import { useState, useCallback } from "react";
+// SPDX-License-Identifier: MIT OR Apache-2.0
+import { useState, useCallback, useRef } from "react";
 import type { Dashboard, DashboardWidget, DashboardFilter } from "../dashboard/types";
+import { buildDependencyGraph } from "../dashboard/dependencies";
 import { DashboardCanvas } from "../components/DashboardCanvas";
 import { DashboardToolbar } from "../components/DashboardToolbar";
 import { DashboardFilterBar } from "../components/DashboardFilterBar";
+import { DependencyGraph } from "../components/DependencyGraph";
+import { ScheduledSnapshots } from "../components/ScheduledSnapshots";
+import { exportToPng } from "../dashboard/export";
 
 const STORAGE_KEY = "beacon_dashboards";
 
@@ -23,6 +28,12 @@ export function DashboardPage() {
   const [dashboards, setDashboards] = useState<Dashboard[]>(loadDashboards);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [realtimeEnabled, setRealtimeEnabled] = useState(true);
+  const [revisions, setRevisions] = useState<Record<string, Dashboard[]>>({});
+  const [snapshotSchedules, setSnapshotSchedules] = useState<
+    Record<string, Array<{ id: string; dashboard_id: string; interval_seconds: number; last_snapshot_at: string | null; enabled: boolean; created_at: string }>>
+  >({});
+  const [showDeps, setShowDeps] = useState(false);
+  const dashboardRef = useRef<HTMLDivElement>(null);
 
   const dashboard = dashboards.find((d) => d.id === currentId) ?? null;
 
@@ -30,6 +41,15 @@ export function DashboardPage() {
     (updated: Dashboard) => {
       const now = new Date().toISOString();
       const withTimestamp = { ...updated, updated_at: now };
+
+      // Store revision.
+      const revs = revisions[updated.id] ?? [];
+      const nextRevs = {
+        ...revisions,
+        [updated.id]: [...revs, { ...withTimestamp }],
+      };
+      setRevisions(nextRevs);
+
       const idx = dashboards.findIndex((d) => d.id === withTimestamp.id);
       let next: Dashboard[];
       if (idx >= 0) {
@@ -42,7 +62,7 @@ export function DashboardPage() {
       saveDashboards(next);
       setCurrentId(withTimestamp.id);
     },
-    [dashboards],
+    [dashboards, revisions],
   );
 
   const handleNew = useCallback(() => {
@@ -98,9 +118,59 @@ export function DashboardPage() {
   }, [dashboard]);
 
   const handleExportPng = useCallback(async () => {
-    if (!dashboard) return;
-    window.print();
+    if (!dashboard || !dashboardRef.current) return;
+    try {
+      await exportToPng(dashboardRef.current, `${dashboard.name}.png`);
+    } catch (err) {
+      console.error("PNG export failed:", err);
+    }
   }, [dashboard]);
+
+  const handleCreateSnapshot = useCallback(
+    (intervalSeconds: number) => {
+      if (!dashboard) return;
+      const id = crypto.randomUUID?.() ?? Date.now().toString(36);
+      const schedule = {
+        id,
+        dashboard_id: dashboard.id,
+        interval_seconds: intervalSeconds,
+        last_snapshot_at: null,
+        enabled: true,
+        created_at: new Date().toISOString(),
+      };
+      setSnapshotSchedules((prev) => ({
+        ...prev,
+        [dashboard.id]: [...(prev[dashboard.id] ?? []), schedule],
+      }));
+    },
+    [dashboard],
+  );
+
+  const handleDeleteSnapshot = useCallback(
+    (scheduleId: string) => {
+      if (!dashboard) return;
+      setSnapshotSchedules((prev) => ({
+        ...prev,
+        [dashboard.id]: (prev[dashboard.id] ?? []).filter((s) => s.id !== scheduleId),
+      }));
+    },
+    [dashboard],
+  );
+
+  const handleToggleSnapshot = useCallback(
+    (scheduleId: string, enabled: boolean) => {
+      if (!dashboard) return;
+      setSnapshotSchedules((prev) => ({
+        ...prev,
+        [dashboard.id]: (prev[dashboard.id] ?? []).map((s) =>
+          s.id === scheduleId ? { ...s, enabled } : s,
+        ),
+      }));
+    },
+    [dashboard],
+  );
+
+  const depGraph = dashboard ? buildDependencyGraph(dashboard) : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
@@ -158,11 +228,22 @@ export function DashboardPage() {
                 maxWidth: 300,
               }}
             />
-            <button onClick={() => handleExportPng} style={btnStyle}>
+            <button onClick={() => handleExportPng()} style={btnStyle}>
               Export PNG
             </button>
             <button onClick={handleExportPdf} style={btnStyle}>
               Export PDF
+            </button>
+            <button
+              onClick={() => setShowDeps((prev) => !prev)}
+              style={{
+                ...btnStyle,
+                background: showDeps ? "#1a3a5e" : "#30363d",
+                borderColor: showDeps ? "#58a6ff" : "#484f58",
+                color: showDeps ? "#58a6ff" : "#8b949e",
+              }}
+            >
+              {showDeps ? "Hide Deps" : "Deps"}
             </button>
             <button
               onClick={() => setRealtimeEnabled((prev) => !prev)}
@@ -187,7 +268,7 @@ export function DashboardPage() {
 
       {/* Dashboard content */}
       {dashboard ? (
-        <div style={{ flex: 1, overflow: "auto", background: "#0d1117" }}>
+        <div ref={dashboardRef} style={{ flex: 1, overflow: "auto", background: "#0d1117" }}>
           {/* Filter bar */}
           {dashboard.filters.length > 0 && (
             <DashboardFilterBar
@@ -234,6 +315,69 @@ export function DashboardPage() {
             }}
             realtime={realtimeEnabled}
           />
+          {/* Version History */}
+          {dashboard && revisions[dashboard.id]?.length ? (
+            <div
+              style={{
+                borderTop: "1px solid #30363d",
+                padding: "0.75rem 1rem",
+                background: "#161b22",
+              }}
+            >
+              <h3 style={{ fontSize: "0.85rem", margin: "0 0 0.5rem", color: "#8b949e" }}>
+                Version History ({revisions[dashboard.id].length} revisions)
+              </h3>
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", maxHeight: 120, overflow: "auto" }}>
+                {revisions[dashboard.id].map((rev, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      // Restore this revision.
+                      const restored = { ...rev, updated_at: new Date().toISOString() };
+                      handleSave(restored);
+                    }}
+                    style={{
+                      background: "#0d1117",
+                      border: "1px solid #30363d",
+                      borderRadius: 4,
+                      color: "#c9d1d9",
+                      cursor: "pointer",
+                      fontSize: "0.75rem",
+                      padding: "0.3rem 0.5rem",
+                    }}
+                    title={`Restore revision ${i + 1}`}
+                  >
+                    v{i + 1} — {new Date(rev.updated_at).toLocaleTimeString()}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {/* Dependency Graph */}
+          {showDeps && depGraph && (
+            <div
+              style={{
+                borderTop: "1px solid #30363d",
+                padding: "0.75rem 1rem",
+                background: "#161b22",
+              }}
+            >
+              <h3 style={{ fontSize: "0.85rem", margin: "0 0 0.5rem", color: "#8b949e" }}>
+                Dependency Graph
+              </h3>
+              <DependencyGraph graph={depGraph} width={700} height={350} />
+            </div>
+          )}
+          {/* Scheduled Snapshots */}
+          {dashboard && (
+            <ScheduledSnapshots
+              dashboardId={dashboard.id}
+              schedules={snapshotSchedules[dashboard.id] ?? []}
+              onCreate={handleCreateSnapshot}
+              onDelete={handleDeleteSnapshot}
+              onToggle={handleToggleSnapshot}
+            />
+          )}
         </div>
       ) : (
         <div

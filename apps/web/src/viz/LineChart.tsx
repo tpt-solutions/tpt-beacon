@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
 import { useEffect, useRef } from "react";
 import * as d3 from "d3";
 import { defaultTheme, type ChartDataPoint, type ChartTheme } from "./theme";

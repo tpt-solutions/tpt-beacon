@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
 import { useMemo, useState, useCallback } from "react";
 import type { DashboardWidget } from "../dashboard/types";
 import type { CdcEvent } from "../hooks/useFluxSubscription";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
 interface ResultsTableProps {
   columns: { name: string; type: string }[];
   rows?: Record<string, unknown>[];

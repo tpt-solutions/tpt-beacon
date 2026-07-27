@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
 import { useState, useCallback } from "react";
 import type { Dashboard, DashboardWidget } from "../dashboard/types";
 import { DashboardWidgetRenderer } from "./DashboardWidgetRenderer";
+import { LazyWidget } from "./LazyWidget";
 
 interface DashboardCanvasProps {
   dashboard: Dashboard;
@@ -127,7 +129,9 @@ export function DashboardCanvas({
               </div>
               {/* Widget content */}
               <div style={{ padding: "0.5rem", minHeight: widget.position.h * dashboard.rowHeight - 40 }}>
-                <DashboardWidgetRenderer widget={widget} realtime={realtime} />
+                <LazyWidget>
+                  <DashboardWidgetRenderer widget={widget} realtime={realtime} />
+                </LazyWidget>
               </div>
             </div>
           ))}

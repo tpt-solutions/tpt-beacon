@@ -93,6 +93,14 @@ pub async fn metrics_middleware(
         })
         .unwrap_or_else(|| "unknown".to_string());
 
+    // Enforce rate limit via AppState.
+    if let Some(state) = req.extensions().get::<crate::AppState>().cloned() {
+        if !state.rate_limiter.check(&ip).await {
+            tracing::warn!(client_ip = %ip, path = %path, "rate limited");
+            return Err(StatusCode::TOO_MANY_REQUESTS);
+        }
+    }
+
     let response = next.run(req).await;
 
     let elapsed = start.elapsed().as_millis();

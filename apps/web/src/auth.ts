@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
 /**
  * Auth API client — signup, login, token management.
  */
@@ -121,4 +122,124 @@ export async function deleteUser(userId: string): Promise<boolean> {
     headers: authHeaders(),
   });
   return res.ok;
+}
+
+// ── API Tokens ───────────────────────────────────────────────
+
+export interface ApiToken {
+  id: string;
+  user_id: string;
+  name: string;
+  scopes: string[];
+  expires_at: string | null;
+  created_at: string;
+  last_used: string | null;
+}
+
+export interface CreateTokenResult {
+  token: ApiToken;
+  raw_token: string;
+}
+
+export async function listApiTokens(): Promise<ApiToken[]> {
+  const res = await fetch("/api/tokens", { headers: authHeaders() });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.tokens ?? [];
+}
+
+export async function createApiToken(
+  name: string,
+  scopes: string[],
+  expiresInHours?: number,
+): Promise<CreateTokenResult | null> {
+  const res = await fetch("/api/tokens", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ name, scopes, expires_in_hours: expiresInHours }),
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function deleteApiToken(tokenId: string): Promise<boolean> {
+  const res = await fetch(`/api/tokens/${tokenId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  return res.ok;
+}
+
+// ── Share Links ──────────────────────────────────────────────
+
+export interface ShareLink {
+  id: string;
+  resource_type: string;
+  resource_id: string;
+  created_by: string;
+  permission: "view" | "edit";
+  expires_at: string | null;
+  created_at: string;
+}
+
+export async function listShareLinks(
+  resourceType: string,
+  resourceId: string,
+): Promise<ShareLink[]> {
+  const res = await fetch(
+    `/api/shares?resource_type=${resourceType}&resource_id=${resourceId}`,
+    { headers: authHeaders() },
+  );
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.shares ?? [];
+}
+
+export async function createShareLink(
+  resourceType: string,
+  resourceId: string,
+  permission: "view" | "edit",
+  expiresInHours?: number,
+): Promise<ShareLink | null> {
+  const res = await fetch("/api/shares", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({
+      resource_type: resourceType,
+      resource_id: resourceId,
+      permission,
+      expires_in_hours: expiresInHours,
+    }),
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function deleteShareLink(linkId: string): Promise<boolean> {
+  const res = await fetch(`/api/shares/${linkId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  return res.ok;
+}
+
+// ── Audit Log ────────────────────────────────────────────────
+
+export interface AuditEntry {
+  id: string;
+  user_id: string;
+  action: string;
+  resource_type: string;
+  resource_id: string;
+  timestamp: string;
+  details: string | null;
+}
+
+export async function getAuditLog(limit = 100): Promise<AuditEntry[]> {
+  const res = await fetch(`/api/audit?limit=${limit}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.entries ?? [];
 }

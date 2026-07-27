@@ -1,31 +1,54 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
 /**
  * Embed page — renders inside an iframe for white-label embedding.
- * Supports theme and filter postMessage updates.
+ * Validates embed tokens, supports theme and filter postMessage updates.
  */
 
 import { useState, useEffect, useCallback } from "react";
 import { DashboardCanvas } from "../components/DashboardCanvas";
 import { DashboardFilterBar } from "../components/DashboardFilterBar";
 import type { Dashboard, DashboardFilter } from "../dashboard/types";
+import { validateEmbedToken, type EmbedValidation } from "../embed/api";
 
 export function EmbedPage() {
   const params = new URLSearchParams(window.location.search);
+  const tokenId = params.get("token");
   const dashboardId = params.get("dashboard");
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [theme, setTheme] = useState<Record<string, string>>({});
   const [_rowFilter, setRowFilter] = useState<Record<string, unknown>>({});
+  const [validation, setValidation] = useState<EmbedValidation | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load dashboard from parent frame or localStorage.
+  // Validate embed token.
   useEffect(() => {
-    if (dashboardId) {
-      const stored = localStorage.getItem("beacon_dashboards");
-      if (stored) {
-        const all: Dashboard[] = JSON.parse(stored);
-        const found = all.find((d) => d.id === dashboardId);
-        if (found) setDashboard(found);
-      }
+    if (!tokenId) {
+      setError("No embed token provided");
+      return;
     }
-  }, [dashboardId]);
+    validateEmbedToken(tokenId).then((v) => {
+      if (!v || !v.valid) {
+        setError("Invalid or expired embed token");
+        return;
+      }
+      setValidation(v);
+      if (v.theme) setTheme(v.theme);
+      if (v.row_filter) setRowFilter(v.row_filter);
+    });
+  }, [tokenId]);
+
+  // Load dashboard from localStorage.
+  useEffect(() => {
+    const did = validation?.dashboard_id ?? dashboardId;
+    if (!did) return;
+
+    const stored = localStorage.getItem("beacon_dashboards");
+    if (stored) {
+      const all: Dashboard[] = JSON.parse(stored);
+      const found = all.find((d) => d.id === did);
+      if (found) setDashboard(found);
+    }
+  }, [validation, dashboardId]);
 
   // Listen for postMessage updates from parent.
   useEffect(() => {
@@ -43,6 +66,24 @@ export function EmbedPage() {
     },
     [dashboard],
   );
+
+  if (error) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "100vh",
+          background: "#0d1117",
+          color: "#f85149",
+          fontFamily: "system-ui, sans-serif",
+        }}
+      >
+        {error}
+      </div>
+    );
+  }
 
   if (!dashboard) {
     return (

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
 /**
  * React hook for real-time Flux WebSocket subscriptions.
  * Handles connection, reconnection with exponential backoff, and event dispatch.

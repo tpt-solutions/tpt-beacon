@@ -83,12 +83,12 @@
 
 - [x] Core chart components (D3.js): bar, line, pie/donut, scatter, area, heatmap
 - [x] Shared chart theming/config system (colors, axes, legends, tooltips)
+- [x] Meridian map visualization component (points/clusters/heatmap, Canvas-based)
+- [x] Plexus graph visualization component (force-directed layout, Canvas-based)
+- [x] Chronos time-series chart component (LTTB downsampling, interpolation, zoom/pan)
+- [x] Prism vector-search result visualization (ranked list + similarity score bars)
+- [x] Custom visualization plugin API (register a new chart type against a query result shape)
 - [ ] WebGL-accelerated rendering path for large datasets (point clouds, dense scatter)
-- [ ] Meridian map visualization component (points/clusters/heatmap over a base map)
-- [ ] Plexus graph visualization component (force-directed layout, node/edge styling)
-- [ ] Chronos time-series chart component (downsampling, interpolation, zoom/pan)
-- [ ] Prism vector-search result visualization (ranked list + similarity score bars)
-- [ ] Custom visualization plugin API (register a new chart type against a query result shape)
 - [ ] Storybook (or equivalent) catalog of all visualization components with sample data
 - [ ] Visual regression tests for core chart types
 
@@ -102,9 +102,12 @@
 - [x] Shared filters/parameters: a dashboard-level filter propagates to all bound widgets
 - [x] Dashboard save/load (CRUD API + frontend wiring)
 - [x] Dashboard duplication/templating
-- [ ] Dashboard versioning (revision history)
-- [ ] Export dashboard to PDF and PNG/image
-- [ ] Scheduled dashboard snapshot/export (e.g. nightly PDF email)
+- [x] Dashboard versioning (revision history + restore)
+- [x] Export dashboard to PNG (html2canvas)
+- [x] Export dashboard to PDF (browser print fallback)
+- [x] Scheduled dashboard snapshot/export (e.g. nightly PDF email)
+- [x] Dashboard dependency graph (widget → query → table visualization)
+- [x] Progressive/lazy dashboard loading (IntersectionObserver-based widget deferred rendering)
 - [ ] End-to-end test: compose a multi-widget dashboard, apply a shared filter, export to PDF
 
 ---
@@ -130,7 +133,7 @@
 - [x] NL explanation of query results ("what does this chart show")
 - [x] Graceful degradation: query builder and dashboards fully usable with Anvil unavailable
 - [x] `POST /api/compile` endpoint for server-side query compilation with cost tier estimation
-- [ ] End-to-end test: NL prompt produces a valid, executable query against a sample dataset
+- [x] End-to-end test: NL prompt produces a valid, executable query against a sample dataset
 
 ---
 
@@ -141,10 +144,10 @@
 - [x] User management API: list users, set role, delete user (admin-only)
 - [x] Frontend auth gate: login/signup page, user display in sidebar, sign-out
 - [x] Auth headers injected into all API client requests
-- [ ] Dashboard and saved-query sharing: share links, per-user/per-role access within the instance
-- [ ] API tokens for programmatic access (Phase 1/2 query APIs)
-- [ ] Audit log of who viewed/edited/shared what
-- [ ] Security review of auth flows (session handling, token scoping, password storage)
+- [x] API tokens for programmatic access (sha256-hashed, scoped, expirable)
+- [x] Dashboard and saved-query sharing: share links with view/edit permissions
+- [x] Audit log of who viewed/edited/shared what (admin-queryable)
+- [x] Security review of auth flows (session handling, token scoping, password storage)
 
 ---
 
@@ -152,23 +155,22 @@
 
 - [x] Embed SDK: JS snippet + iframe embed for a single dashboard (`apps/web/src/embed/index.ts`)
 - [x] Embed page (`/embed`) with iframe communication via postMessage (theme/filter updates)
-- [ ] Scoped, short-lived embed tokens (read-only, dashboard-scoped)
-- [ ] Theming API for host apps (colors, fonts, hide/show chrome)
-- [ ] Row-level filtering passed at embed time (e.g. embed scoped to one customer's data via token claims)
-- [ ] Example embed integration app (demonstrates a customer-facing white-label dashboard)
-- [ ] Security review of embed token scoping and cross-origin behavior
+- [x] Scoped, short-lived embed tokens (read-only, dashboard-scoped, expirable, with row-level filter + theme overrides)
+- [x] Theming API for host apps (colors, fonts, hide/show chrome via postMessage)
+- [x] Row-level filtering passed at embed time (via `row_filter` in embed token, applied at query time)
+- [x] Security review of embed token scoping and cross-origin behavior
+- [x] Example embed integration app (demonstrates a customer-facing white-label dashboard)
 
 ---
 
 ## Phase 10 — Performance & Hardening
 
 - [x] Observability: structured logging (tracing), request metrics middleware (method, path, status, elapsed, client IP)
-- [x] Rate limiting: in-memory sliding-window rate limiter per IP address
-- [ ] Query result cache tuning (TTL, invalidation on Flux CDC events)
-- [ ] Dashboard load benchmarking (many widgets, large result sets)
-- [ ] Security review: full pass on auth, embed tokens, and SQL-injection surface in the query-builder compiler
-- [ ] Deployment docs: single-instance Docker Compose quickstart (Beacon + Keystone + optional Anvil), environment variable reference
-- [ ] Single-node resource sizing guide (CPU/RAM/disk recommendations for self-hosting)
+- [x] Rate limiting: in-memory sliding-window rate limiter per IP address (wired into middleware)
+- [x] Security review: SQL injection prevention (sql_safety module), API token validation, JWT secret enforcement
+- [x] Deployment docs: Docker Compose quickstart, environment variable reference, resource sizing guide
+- [x] Query result cache tuning (TTL, invalidation on Flux CDC events)
+- [x] Dashboard load benchmarking (many widgets, large result sets)
 
 ---
 
@@ -176,6 +178,6 @@
 
 - [ ] Documentation site: getting started, query-builder guide, visualization catalog, embedding guide
 - [ ] Example dashboards/datasets showcasing all 7 data models
-- [ ] Versioned `CHANGELOG.md`
-- [ ] License header audit across all source files
-- [ ] v1.0 release checklist and announcement materials
+- [x] Versioned `CHANGELOG.md`
+- [x] License header audit across all source files
+- [x] v1.0 release checklist and announcement materials

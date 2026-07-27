@@ -12,6 +12,7 @@ use axum::{
 use chrono::{DateTime, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::sync::Arc;
 
 // ── Types ───────────────────────────────────────────────────────
@@ -100,6 +101,19 @@ pub struct AuditEntry {
     pub resource_id: String,
     pub timestamp: DateTime<Utc>,
     pub details: Option<String>,
+}
+
+/// Scoped embed token for embedded analytics (Phase 9).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmbedToken {
+    pub id: String,
+    pub dashboard_id: String,
+    pub created_by: String,
+    pub row_filter: Option<Value>,   // row-level filter applied at embed time
+    pub theme: Option<Value>,        // custom theme overrides
+    pub permissions: Vec<String>,    // ["view"] at minimum
+    pub expires_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
 }
 
 /// Stored user record (includes password hash).
@@ -198,6 +212,7 @@ pub struct UserStore {
     users: std::sync::RwLock<Vec<UserRecord>>,
     api_tokens: std::sync::RwLock<Vec<ApiToken>>,
     share_links: std::sync::RwLock<Vec<ShareLink>>,
+    embed_tokens: std::sync::RwLock<Vec<EmbedToken>>,
     audit_log: std::sync::RwLock<Vec<AuditEntry>>,
     config: AuthConfig,
 }
@@ -208,6 +223,7 @@ impl UserStore {
             users: std::sync::RwLock::new(Vec::new()),
             api_tokens: std::sync::RwLock::new(Vec::new()),
             share_links: std::sync::RwLock::new(Vec::new()),
+            embed_tokens: std::sync::RwLock::new(Vec::new()),
             audit_log: std::sync::RwLock::new(Vec::new()),
             config,
         })
@@ -221,6 +237,14 @@ impl UserStore {
         display_name: &str,
         role: Role,
     ) -> Result<User, String> {
+        // Password strength validation.
+        if password.len() < 8 {
+            return Err("password must be at least 8 characters".into());
+        }
+        if password.len() > 128 {
+            return Err("password must be at most 128 characters".into());
+        }
+
         let mut users = self.users.write().map_err(|e| e.to_string())?;
         if users.iter().any(|u| u.user.email == email) {
             return Err("email already registered".into());
@@ -439,6 +463,61 @@ impl UserStore {
         Ok(())
     }
 
+    // ── Embed Tokens ─────────────────────────────────────────────
+
+    /// Create a scoped, short-lived embed token for a dashboard.
+    pub fn create_embed_token(
+        &self,
+        dashboard_id: &str,
+        created_by: &str,
+        row_filter: Option<Value>,
+        theme: Option<Value>,
+        permissions: Vec<String>,
+        expires_in_hours: u64,
+    ) -> Result<EmbedToken, String> {
+        let now = Utc::now();
+        let token = EmbedToken {
+            id: format!("emb_{}", uuid::Uuid::new_v4().as_simple()),
+            dashboard_id: dashboard_id.to_string(),
+            created_by: created_by.to_string(),
+            row_filter,
+            theme,
+            permissions,
+            expires_at: now + chrono::Duration::hours(expires_in_hours as i64),
+            created_at: now,
+        };
+
+        let mut tokens = self.embed_tokens.write().map_err(|e| e.to_string())?;
+        tokens.push(token.clone());
+        Ok(token)
+    }
+
+    /// Validate an embed token.
+    pub fn validate_embed_token(&self, token_id: &str) -> Result<EmbedToken, String> {
+        let tokens = self.embed_tokens.read().map_err(|e| e.to_string())?;
+        let token = tokens
+            .iter()
+            .find(|t| t.id == token_id)
+            .ok_or("embed token not found")?;
+
+        if Utc::now() > token.expires_at {
+            return Err("embed token expired".into());
+        }
+
+        Ok(token.clone())
+    }
+
+    /// Delete an embed token.
+    pub fn delete_embed_token(&self, token_id: &str) -> Result<(), String> {
+        let mut tokens = self.embed_tokens.write().map_err(|e| e.to_string())?;
+        let len_before = tokens.len();
+        tokens.retain(|t| t.id != token_id);
+        if tokens.len() == len_before {
+            return Err("embed token not found".into());
+        }
+        Ok(())
+    }
+
     // ── Audit Log ────────────────────────────────────────────────
 
     /// Record an audit log entry.
@@ -508,25 +587,40 @@ pub async fn auth_middleware(
         .strip_prefix("Bearer ")
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
+    // Get AppState from extensions for JWT secret and API token validation.
+    let state = req
+        .extensions()
+        .get::<crate::AppState>()
+        .cloned()
+        .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+
     // Try API token first (prefixed with "btk_"), then JWT.
     if token.starts_with("btk_") {
-        // API token — validate via UserStore. We need state but it's not available
-        // in this middleware context. Instead, we'll store the raw token and validate
-        // in the handler. For now, create a minimal Claims from the token prefix.
-        // In production, use a shared UserStore reference.
+        // Validate the API token against the store.
+        let api_token = state
+            .user_store
+            .validate_api_token(token)
+            .map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+        // Get the user to determine their role.
+        let user = state
+            .user_store
+            .get_user(&api_token.user_id)
+            .ok_or(StatusCode::UNAUTHORIZED)?;
+
         let claims = Claims {
-            sub: "api_token".to_string(),
-            email: "api@token".to_string(),
-            role: crate::auth::Role::Viewer, // Will be overridden by token scopes
-            exp: usize::MAX,
+            sub: user.id,
+            email: user.email,
+            role: user.role,
+            exp: api_token.expires_at.map(|e| e.timestamp() as usize).unwrap_or(usize::MAX),
             iat: 0,
         };
         req.extensions_mut().insert(claims);
         return Ok(next.run(req).await);
     }
 
-    let config = AuthConfig::default();
-    let claims = validate_token(token, &config).map_err(|_| StatusCode::UNAUTHORIZED)?;
+    let claims = validate_token(token, &state.user_store.config())
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
 
     // Insert claims into request extensions for downstream handlers.
     req.extensions_mut().insert(claims);

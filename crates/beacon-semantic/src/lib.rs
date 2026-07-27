@@ -16,9 +16,10 @@ pub mod ast;
 pub mod cache;
 pub mod compiler;
 pub mod cost;
+pub mod sql_safety;
 
 pub use ast::*;
-pub use cache::QueryCache;
+pub use cache::{CacheConfig, QueryCache};
 pub use compiler::compile;
 pub use cost::{CostGuard, CostGuardError};
 

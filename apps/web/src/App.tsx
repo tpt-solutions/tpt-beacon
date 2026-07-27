@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
 import { useState, useEffect, useCallback } from "react";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
 import { QueryBuilderPage } from "./pages/QueryBuilderPage";
@@ -5,6 +6,7 @@ import { SavedQueriesPage } from "./pages/SavedQueriesPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
 import { EmbedPage } from "./pages/EmbedPage";
+import { AdminPage } from "./pages/AdminPage";
 import { getCurrentUser, clearToken, type User } from "./auth";
 
 export function App() {
@@ -22,13 +24,13 @@ export function App() {
     setUser(null);
   }, []);
 
-  if (!authChecked) {
   // Embed mode — render without shell.
   if (location.pathname === "/embed") {
     return <EmbedPage />;
   }
 
-  return (
+  if (!authChecked) {
+    return (
       <div
         style={{
           display: "flex",
@@ -52,6 +54,7 @@ export function App() {
     { path: "/", label: "Query Builder" },
     { path: "/dashboards", label: "Dashboards" },
     { path: "/saved", label: "Saved Queries" },
+    { path: "/admin", label: "Admin", adminOnly: true },
   ];
 
   return (
@@ -90,22 +93,24 @@ export function App() {
             pre-alpha
           </p>
         </div>
-        {navItems.map((item) => (
-          <Link
-            key={item.path}
-            to={item.path}
-            style={{
-              display: "block",
-              padding: "0.5rem 1rem",
-              color: location.pathname === item.path ? "#58a6ff" : "#c9d1d9",
-              textDecoration: "none",
-              background: location.pathname === item.path ? "#1f2937" : "transparent",
-              fontSize: "0.9rem",
-            }}
-          >
-            {item.label}
-          </Link>
-        ))}
+        {navItems
+          .filter((item) => !item.adminOnly || user.role === "admin")
+          .map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              style={{
+                display: "block",
+                padding: "0.5rem 1rem",
+                color: location.pathname === item.path ? "#58a6ff" : "#c9d1d9",
+                textDecoration: "none",
+                background: location.pathname === item.path ? "#1f2937" : "transparent",
+                fontSize: "0.9rem",
+              }}
+            >
+              {item.label}
+            </Link>
+          ))}
         <div style={{ flex: 1 }} />
         {/* User info */}
         <div
@@ -144,6 +149,7 @@ export function App() {
           <Route path="/" element={<QueryBuilderPage />} />
           <Route path="/dashboards" element={<DashboardPage />} />
           <Route path="/saved" element={<SavedQueriesPage />} />
+          <Route path="/admin" element={<AdminPage />} />
         </Routes>
       </main>
     </div>

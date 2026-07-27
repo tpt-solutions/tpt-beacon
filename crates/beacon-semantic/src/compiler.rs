@@ -5,6 +5,7 @@
 
 use crate::ast::*;
 use crate::cost::estimate_cost;
+use crate::sql_safety::{safe_identifier, validate_expression, validate_graph_pattern, validate_time_interval};
 use crate::SemanticError;
 use sha2::{Digest, Sha256};
 
@@ -64,7 +65,8 @@ impl<'a> CompileContext<'a> {
         Ok(Self {
             request,
             sql: String::new(),
-            from_clause: format!("\"{}\"", request.source),
+            from_clause: safe_identifier(request.source.as_str())
+                .map_err(|e| SemanticError::Compile(e))?,
             joins: Vec::new(),
             where_clauses: Vec::new(),
             group_by: Vec::new(),
@@ -163,25 +165,38 @@ impl<'a> CompileContext<'a> {
                     "date_trunc('year', \"{}\")",
                     tb.time_column
                 ),
-                TimeInterval::Custom(expr) => expr.clone(),
+                TimeInterval::Custom(expr) => {
+                    validate_time_interval(expr)
+                        .map_err(|e| SemanticError::Compile(e))?
+                },
             };
             self.select.push(format!("{bucket_expr} AS \"time_bucket\""));
         }
 
         // Dimensions.
         for dim in &self.request.dimensions {
+            let safe_col = safe_identifier(&dim.column)
+                .map_err(|e| SemanticError::Compile(e))?;
             let col = if let Some(alias) = &dim.table_alias {
-                format!("\"{}\".\"{}\"", alias, dim.column)
+                let safe_alias = safe_identifier(alias)
+                    .map_err(|e| SemanticError::Compile(e))?;
+                format!("{safe_alias}.{safe_col}")
             } else {
-                format!("\"{}\"", dim.column)
+                safe_col
             };
-            self.select.push(format!("{col} AS \"{}\"", dim.name));
+            let safe_name = safe_identifier(&dim.name)
+                .map_err(|e| SemanticError::Compile(e))?;
+            self.select.push(format!("{col} AS {safe_name}"));
         }
 
         // Metrics.
         for metric in &self.request.metrics {
+            let validated_expr = validate_expression(&metric.expression)
+                .map_err(|e| SemanticError::Compile(e))?;
+            let safe_name = safe_identifier(&metric.name)
+                .map_err(|e| SemanticError::Compile(e))?;
             self.select
-                .push(format!("({}) AS \"{}\"", metric.expression, metric.name));
+                .push(format!("({validated_expr}) AS {safe_name}"));
         }
 
         // Vector search results (Prism): add distance column.
@@ -235,15 +250,16 @@ impl<'a> CompileContext<'a> {
             JoinType::Full => "FULL JOIN",
             JoinType::Cross => "CROSS JOIN",
         };
+        let safe_table = safe_identifier(&join.table)
+            .map_err(|e| SemanticError::Compile(e))?;
+        let safe_alias = safe_identifier(&join.alias)
+            .map_err(|e| SemanticError::Compile(e))?;
+        let safe_left = safe_identifier(&join.on.left_column)
+            .map_err(|e| SemanticError::Compile(e))?;
+        let safe_right = safe_identifier(&join.on.right_column)
+            .map_err(|e| SemanticError::Compile(e))?;
         self.joins.push(format!(
-            "{} \"{}\" AS \"{}\" ON \"{}\".\"{}\" = \"{}\".\"{}\"",
-            jt,
-            join.table,
-            join.alias,
-            self.request.source,
-            join.on.left_column,
-            join.alias,
-            join.on.right_column,
+            "{jt} {safe_table} AS {safe_alias} ON {safe_left} = {safe_alias}.{safe_right}",
         ));
         Ok(())
     }
@@ -253,10 +269,14 @@ impl<'a> CompileContext<'a> {
     // ------------------------------------------------------------------
 
     fn compile_filter(&mut self, filter: &Filter) -> Result<(), SemanticError> {
+        let safe_col = safe_identifier(&filter.column)
+            .map_err(|e| SemanticError::Compile(e))?;
         let col = if let Some(alias) = &filter.table_alias {
-            format!("\"{}\".\"{}\"", alias, filter.column)
+            let safe_alias = safe_identifier(alias)
+                .map_err(|e| SemanticError::Compile(e))?;
+            format!("{safe_alias}.{safe_col}")
         } else {
-            format!("\"{}\"", filter.column)
+            safe_col
         };
 
         let clause = match &filter.operator {
@@ -439,9 +459,14 @@ impl<'a> CompileContext<'a> {
     fn compile_graph_pattern(&mut self, gp: &GraphPattern) -> Result<(), SemanticError> {
         // Graph patterns are passed through as a Cypher-like clause.
         // Keystone's Plexus extension interprets MATCH at the SQL level.
-        let mut clause = format!("MATCH {}", gp.pattern);
+        // Validate the pattern to prevent SQL injection.
+        let pattern = validate_graph_pattern(&gp.pattern)
+            .map_err(|e| SemanticError::Compile(e))?;
+        let mut clause = format!("MATCH {pattern}");
         if let Some(w) = &gp.where_clause {
-            clause.push_str(&format!(" WHERE {w}"));
+            let where_validated = validate_graph_pattern(w)
+                .map_err(|e| SemanticError::Compile(format!("invalid where clause: {e}")))?;
+            clause.push_str(&format!(" WHERE {where_validated}"));
         }
         self.where_clauses.push(clause);
         Ok(())

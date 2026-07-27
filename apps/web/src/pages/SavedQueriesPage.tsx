@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
 import { useState, useEffect, useCallback } from "react";
 import type { SavedQuery } from "../types";
 import { fetchSavedQueries, deleteQuery } from "../api";

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TPT Beacon — Embed Integration Example</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+    }
+    header {
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    header h1 { font-size: 20px; font-weight: 600; }
+    header span { color: #8b949e; font-size: 14px; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 32px; }
+    .config-panel {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .config-panel h2 { font-size: 16px; margin-bottom: 16px; }
+    .form-row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-group label { font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
+    .form-group input, .form-group select {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: #e6edf3;
+      font-size: 14px;
+      min-width: 200px;
+    }
+    .form-group input:focus, .form-group select:focus {
+      outline: none;
+      border-color: #58a6ff;
+    }
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid #30363d;
+      background: #21262d;
+      color: #e6edf3;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .btn:hover { background: #30363d; }
+    .btn-primary { background: #238636; border-color: #2ea043; }
+    .btn-primary:hover { background: #2ea043; }
+    .btn-danger { background: #da3633; border-color: #f85149; }
+    .btn-danger:hover { background: #f85149; }
+    .embed-area {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 24px;
+      min-height: 400px;
+    }
+    .embed-area h2 { font-size: 16px; margin-bottom: 16px; }
+    #embed-container {
+      background: #0d1117;
+      border: 1px dashed #30363d;
+      border-radius: 8px;
+      min-height: 300px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #8b949e;
+    }
+    #embed-container.has-frame { border-style: solid; }
+    .theme-swatches {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .swatch {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      border: 2px solid transparent;
+      cursor: pointer;
+    }
+    .swatch.active { border-color: #e6edf3; }
+    .status {
+      margin-top: 12px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      display: none;
+    }
+    .status.show { display: block; }
+    .status.success { background: #0d419d33; border: 1px solid #58a6ff; color: #58a6ff; }
+    .status.error { background: #da363333; border: 1px solid #f85149; color: #f85149; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>TPT Beacon</h1>
+    <span>Embed Integration Example</span>
+  </header>
+
+  <div class="container">
+    <div class="config-panel">
+      <h2>Configuration</h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Beacon URL</label>
+          <input id="cfg-url" type="text" value="http://localhost:3000" />
+        </div>
+        <div class="form-group">
+          <label>Embed Token</label>
+          <input id="cfg-token" type="text" placeholder="embed_..." />
+        </div>
+        <div class="form-group">
+          <label>Dashboard ID</label>
+          <input id="cfg-dashboard" type="text" placeholder="dash_..." />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Height (px)</label>
+          <input id="cfg-height" type="number" value="600" min="200" max="2000" />
+        </div>
+        <div class="form-group">
+          <label>Theme Preset</label>
+          <select id="cfg-theme">
+            <option value="default">Default (dark)</option>
+            <option value="light">Light</option>
+            <option value="ocean">Ocean</option>
+            <option value="sunset">Sunset</option>
+            <option value="minimal">Minimal</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Row Filter Column</label>
+          <input id="cfg-filter-col" type="text" placeholder="region" />
+        </div>
+        <div class="form-group">
+          <label>Row Filter Value</label>
+          <input id="cfg-filter-val" type="text" placeholder="us-east" />
+        </div>
+      </div>
+      <div class="form-row">
+        <button class="btn btn-primary" onclick="mountEmbed()">Mount</button>
+        <button class="btn" onclick="updateTheme()">Update Theme</button>
+        <button class="btn" onclick="updateFilter()">Update Filter</button>
+        <button class="btn btn-danger" onclick="unmountEmbed()">Unmount</button>
+      </div>
+      <div id="status" class="status"></div>
+    </div>
+
+    <div class="embed-area">
+      <h2>Embedded Dashboard</h2>
+      <div id="embed-container">
+        Configure and click "Mount" to embed a dashboard.
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // ── In a real integration, load the SDK: ──
+    // <script src="/beacon-embed.js"><\/script>
+    // Then use window.BeaconEmbed.init(...)
+    //
+    // For this example, we inline the minimal SDK logic.
+
+    const THEMES = {
+      default: {},
+      light: { background: "#ffffff", text: "#1f2328", primary: "#0969da", cardBackground: "#f6f8fa" },
+      ocean: { background: "#0a1628", text: "#c9d1d9", primary: "#58a6ff", cardBackground: "#0d1f3c" },
+      sunset: { background: "#1a0a2e", text: "#e6d5f5", primary: "#f78166", cardBackground: "#2d1b4e" },
+      minimal: { background: "#ffffff", text: "#333333", primary: "#333333", cardBackground: "#ffffff" },
+    };
+
+    let currentInstance = null;
+
+    function showStatus(msg, type = "success") {
+      const el = document.getElementById("status");
+      el.textContent = msg;
+      el.className = `status show ${type}`;
+      setTimeout(() => (el.className = "status"), 4000);
+    }
+
+    function getConfig() {
+      return {
+        url: document.getElementById("cfg-url").value.replace(/\/+$/, ""),
+        token: document.getElementById("cfg-token").value,
+        dashboardId: document.getElementById("cfg-dashboard").value,
+        height: parseInt(document.getElementById("cfg-height").value, 10),
+        themeKey: document.getElementById("cfg-theme").value,
+        filterCol: document.getElementById("cfg-filter-col").value,
+        filterVal: document.getElementById("cfg-filter-val").value,
+      };
+    }
+
+    function buildEmbedUrl(cfg) {
+      const params = new URLSearchParams();
+      params.set("embed", "1");
+      params.set("token", cfg.token);
+      if (cfg.dashboardId) params.set("dashboard", cfg.dashboardId);
+      return `${cfg.url}/embed?${params.toString()}`;
+    }
+
+    window.mountEmbed = function () {
+      const cfg = getConfig();
+      if (!cfg.token) return showStatus("Embed token is required", "error");
+      if (currentInstance) currentInstance.remove();
+
+      const container = document.getElementById("embed-container");
+      container.innerHTML = "";
+
+      const iframe = document.createElement("iframe");
+      iframe.src = buildEmbedUrl(cfg);
+      iframe.style.width = "100%";
+      iframe.style.height = `${cfg.height}px`;
+      iframe.style.border = "none";
+      iframe.style.borderRadius = "8px";
+      iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms");
+      iframe.setAttribute("loading", "lazy");
+
+      iframe.onload = () => {
+        // Apply initial theme.
+        const theme = THEMES[cfg.themeKey] || {};
+        if (Object.keys(theme).length > 0) {
+          iframe.contentWindow?.postMessage({ type: "beacon:theme", theme }, cfg.url);
+        }
+        // Apply initial filter.
+        if (cfg.filterCol && cfg.filterVal) {
+          iframe.contentWindow?.postMessage(
+            { type: "beacon:filter", filter: { [cfg.filterCol]: cfg.filterVal } },
+            cfg.url,
+          );
+        }
+        showStatus("Dashboard mounted successfully");
+      };
+
+      iframe.onerror = () => showStatus("Failed to load embed", "error");
+
+      container.appendChild(iframe);
+      container.classList.add("has-frame");
+      currentInstance = iframe;
+    };
+
+    window.updateTheme = function () {
+      if (!currentInstance) return showStatus("No embed mounted", "error");
+      const cfg = getConfig();
+      const theme = THEMES[cfg.themeKey] || {};
+      currentInstance.contentWindow?.postMessage(
+        { type: "beacon:theme", theme },
+        cfg.url,
+      );
+      showStatus("Theme updated");
+    };
+
+    window.updateFilter = function () {
+      if (!currentInstance) return showStatus("No embed mounted", "error");
+      const cfg = getConfig();
+      if (cfg.filterCol && cfg.filterVal) {
+        currentInstance.contentWindow?.postMessage(
+          { type: "beacon:filter", filter: { [cfg.filterCol]: cfg.filterVal } },
+          cfg.url,
+        );
+        showStatus("Filter updated");
+      } else {
+        showStatus("Provide filter column and value", "error");
+      }
+    };
+
+    window.unmountEmbed = function () {
+      if (!currentInstance) return showStatus("No embed mounted", "error");
+      currentInstance.remove();
+      currentInstance = null;
+      const container = document.getElementById("embed-container");
+      container.innerHTML = "Configure and click \"Mount\" to embed a dashboard.";
+      container.classList.remove("has-frame");
+      showStatus("Embed unmounted");
+    };
+  </script>
+</body>
+</html>

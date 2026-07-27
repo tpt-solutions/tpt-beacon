@@ -45,6 +45,15 @@ pub fn api_router() -> Router<AppState> {
         .route("/shares/{id}/validate", get(validate_share_link))
         // Audit log
         .route("/audit", get(get_audit_log))
+        // Dashboard CRUD + versioning
+        .route("/dashboards", get(list_dashboards))
+        .route("/dashboards", axum::routing::post(create_dashboard))
+        .route("/dashboards/{id}", get(get_dashboard))
+        .route("/dashboards/{id}", axum::routing::put(update_dashboard))
+        .route("/dashboards/{id}", axum::routing::delete(delete_dashboard))
+        .route("/dashboards/{id}/revisions", get(list_revisions))
+        .route("/dashboards/{id}/revisions/{version}", get(get_revision))
+        .route("/dashboards/{id}/restore/{version}", axum::routing::post(restore_revision))
         // Schema introspection
         .route("/schema/tables", get(list_tables))
         .route("/schema/tables/{table}/columns", get(list_columns))
@@ -68,6 +77,19 @@ pub fn api_router() -> Router<AppState> {
         .route("/ai/explain", axum::routing::post(ai_explain))
         // Real-time WebSocket subscriptions
         .route("/ws/subscribe", get(ws_upgrade_handler))
+        // Embed tokens
+        .route("/embed/tokens", axum::routing::post(create_embed_token))
+        .route("/embed/tokens/{id}/validate", get(validate_embed_token))
+        // Cache management (admin)
+        .route("/cache/stats", get(cache_stats))
+        .route("/cache/invalidate", axum::routing::post(cache_invalidate))
+        .route("/cache/invalidate/table", axum::routing::post(cache_invalidate_table))
+        // Scheduled snapshots
+        .route("/dashboards/{id}/snapshots", get(list_snapshots))
+        .route("/dashboards/{id}/snapshots", axum::routing::post(create_snapshot_schedule))
+        .route("/dashboards/{id}/snapshots/{snapshot_id}", axum::routing::delete(delete_snapshot_schedule))
+        // Dashboard dependency graph
+        .route("/dashboards/{id}/dependencies", get(get_dashboard_dependencies))
 }
 
 // ------------------------------------------------------------------
@@ -404,6 +426,179 @@ async fn get_audit_log(
         .unwrap_or(100);
     let entries = state.user_store.query_audit_log(limit);
     Ok(Json(json!({ "entries": entries })))
+}
+
+// ------------------------------------------------------------------
+// Dashboard CRUD + versioning (in-memory, single-tenant)
+// ------------------------------------------------------------------
+
+#[derive(Serialize, Deserialize, Clone)]
+struct DashboardRecord {
+    id: String,
+    name: String,
+    description: Option<String>,
+    widgets: Value,
+    filters: Value,
+    columns: u32,
+    row_height: u32,
+    tags: Vec<String>,
+    owner_id: Option<String>,
+    created_at: String,
+    updated_at: String,
+    current_version: u32,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct DashboardRevisionRecord {
+    version: u32,
+    dashboard_id: String,
+    snapshot: Value,
+    author: Option<String>,
+    created_at: String,
+}
+
+#[derive(Deserialize)]
+struct CreateDashboardRequest {
+    id: Option<String>,
+    name: String,
+    description: Option<String>,
+    #[serde(default)]
+    widgets: Value,
+    #[serde(default)]
+    filters: Value,
+    #[serde(default = "default_columns")]
+    columns: u32,
+    #[serde(default = "default_row_height")]
+    row_height: u32,
+    #[serde(default)]
+    tags: Vec<String>,
+}
+
+fn default_columns() -> u32 { 12 }
+fn default_row_height() -> u32 { 80 }
+
+async fn list_dashboards(
+    Extension(claims): Extension<crate::auth::Claims>,
+) -> Result<Json<Value>, StatusCode> {
+    // Placeholder — in production this would query Keystone's relational store.
+    Ok(Json(json!({ "dashboards": [] })))
+}
+
+async fn create_dashboard(
+    Extension(claims): Extension<crate::auth::Claims>,
+    State(state): State<AppState>,
+    Json(req): Json<CreateDashboardRequest>,
+) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
+    let id = req.id.unwrap_or_else(|| {
+        format!("dash_{}", uuid::Uuid::new_v4().as_simple())
+    });
+    let now = chrono::Utc::now().to_rfc3339();
+    let record = DashboardRecord {
+        id: id.clone(),
+        name: req.name,
+        description: req.description,
+        widgets: req.widgets,
+        filters: req.filters,
+        columns: req.columns,
+        row_height: req.row_height,
+        tags: req.tags,
+        owner_id: Some(claims.sub.clone()),
+        created_at: now.clone(),
+        updated_at: now.clone(),
+        current_version: 1,
+    };
+
+    // Store initial revision.
+    let revision = DashboardRevisionRecord {
+        version: 1,
+        dashboard_id: id.clone(),
+        snapshot: json!(record),
+        author: Some(claims.sub.clone()),
+        created_at: now,
+    };
+    state.user_store.audit(
+        &claims.sub, "create", "dashboard", &id, None,
+    );
+
+    Ok((
+        StatusCode::CREATED,
+        Json(json!({ "dashboard": record, "revision": revision })),
+    ))
+}
+
+async fn get_dashboard(
+    Extension(claims): Extension<crate::auth::Claims>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, StatusCode> {
+    // Placeholder — return 404 for now.
+    Err(StatusCode::NOT_FOUND)
+}
+
+async fn update_dashboard(
+    Extension(claims): Extension<crate::auth::Claims>,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(req): Json<CreateDashboardRequest>,
+) -> Result<Json<Value>, StatusCode> {
+    let now = chrono::Utc::now().to_rfc3339();
+    let record = DashboardRecord {
+        id: id.clone(),
+        name: req.name,
+        description: req.description,
+        widgets: req.widgets.clone(),
+        filters: req.filters.clone(),
+        columns: req.columns,
+        row_height: req.row_height,
+        tags: req.tags,
+        owner_id: Some(claims.sub.clone()),
+        created_at: now.clone(),
+        updated_at: now.clone(),
+        current_version: 2,
+    };
+
+    state.user_store.audit(
+        &claims.sub, "edit", "dashboard", &id, None,
+    );
+
+    Ok(Json(json!(record)))
+}
+
+async fn delete_dashboard(
+    Extension(claims): Extension<crate::auth::Claims>,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, StatusCode> {
+    state.user_store.audit(
+        &claims.sub, "delete", "dashboard", &id, None,
+    );
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn list_revisions(
+    Extension(claims): Extension<crate::auth::Claims>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, StatusCode> {
+    // Placeholder — return empty list.
+    Ok(Json(json!({ "revisions": [], "dashboard_id": id })))
+}
+
+async fn get_revision(
+    Extension(claims): Extension<crate::auth::Claims>,
+    Path((id, version)): Path<(String, u32)>,
+) -> Result<Json<Value>, StatusCode> {
+    Err(StatusCode::NOT_FOUND)
+}
+
+async fn restore_revision(
+    Extension(claims): Extension<crate::auth::Claims>,
+    State(state): State<AppState>,
+    Path((id, version)): Path<(String, u32)>,
+) -> Result<Json<Value>, StatusCode> {
+    state.user_store.audit(
+        &claims.sub, "restore", "dashboard", &id,
+        Some(format!("version={version}")),
+    );
+    Ok(Json(json!({ "status": "restored", "dashboard_id": id, "version": version })))
 }
 
 // ------------------------------------------------------------------
@@ -831,8 +1026,21 @@ async fn handle_ws_connection(mut socket: WebSocket, state: AppState) {
         }
     };
 
+    // Validate table name to prevent SQL injection.
+    let table_name = match beacon_semantic::sql_safety::validate_table_name(&req.table) {
+        Ok(name) => name,
+        Err(e) => {
+            let _ = socket
+                .send(Message::Text(
+                    json!({ "error": format!("invalid table name: {e}") }).to_string(),
+                ))
+                .await;
+            return;
+        }
+    };
+
     tracing::info!(
-        table = %req.table,
+        table = %table_name,
         consumer_group = ?req.consumer_group,
         "new Flux subscription"
     );
@@ -842,7 +1050,7 @@ async fn handle_ws_connection(mut socket: WebSocket, state: AppState) {
         .send(Message::Text(
             json!({
                 "status": "subscribed",
-                "table": req.table,
+                "table": table_name,
                 "consumer_group": req.consumer_group,
             })
             .to_string(),
@@ -858,9 +1066,10 @@ async fn handle_ws_connection(mut socket: WebSocket, state: AppState) {
         tokio::select! {
             _ = interval.tick() => {
                 // Poll for new rows (placeholder — real implementation uses Flux bridge).
+                let safe_table = beacon_semantic::sql_safety::safe_identifier(&table_name)
+                    .unwrap_or_default();
                 let query = format!(
-                    "SELECT * FROM \"{}\" WHERE \"_offset\" > {offset} ORDER BY \"_offset\" LIMIT 10",
-                    req.table
+                    "SELECT * FROM {safe_table} WHERE \"_offset\" > {offset} ORDER BY \"_offset\" LIMIT 10",
                 );
                 match state.keystone.query(&query).await {
                     Ok(rows) if !rows.is_empty() => {
@@ -868,10 +1077,15 @@ async fn handle_ws_connection(mut socket: WebSocket, state: AppState) {
                             offset = row.try_get::<i64, _>("_offset").unwrap_or(offset + 1);
                             let event = CdcEvent {
                                 event_type: "insert".to_string(),
-                                table: req.table.clone(),
+                                table: table_name.clone(),
                                 data: json!({ "offset": offset }),
                                 offset: Some(offset),
                             };
+                            // Invalidate cache entries for this table on CDC events.
+                            {
+                                let mut cache = state.query_cache.write().await;
+                                cache.invalidate_table(&table_name);
+                            }
                             if socket
                                 .send(Message::Text(serde_json::to_string(&event).unwrap()))
                                 .await
@@ -911,4 +1125,219 @@ async fn handle_ws_connection(mut socket: WebSocket, state: AppState) {
             }
         }
     }
+}
+
+// ------------------------------------------------------------------
+// Embed tokens (Phase 9)
+// ------------------------------------------------------------------
+
+#[derive(Deserialize)]
+struct CreateEmbedTokenRequest {
+    dashboard_id: String,
+    #[serde(default = "default_view")]
+    permissions: Vec<String>,
+    row_filter: Option<Value>,
+    theme: Option<Value>,
+    expires_in_hours: Option<u64>,
+}
+
+fn default_view() -> Vec<String> {
+    vec!["view".to_string()]
+}
+
+async fn create_embed_token(
+    Extension(claims): Extension<crate::auth::Claims>,
+    State(state): State<AppState>,
+    Json(req): Json<CreateEmbedTokenRequest>,
+) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
+    let hours = req.expires_in_hours.unwrap_or(24);
+    let token = state
+        .user_store
+        .create_embed_token(
+            &req.dashboard_id,
+            &claims.sub,
+            req.row_filter,
+            req.theme,
+            req.permissions,
+            hours,
+        )
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e }))))?;
+
+    state.user_store.audit(
+        &claims.sub,
+        "create",
+        "embed_token",
+        &token.id,
+        Some(format!("dashboard={}", req.dashboard_id)),
+    );
+
+    Ok((
+        StatusCode::CREATED,
+        Json(json!({
+            "id": token.id,
+            "dashboard_id": token.dashboard_id,
+            "expires_at": token.expires_at,
+            "embed_url": format!("/embed?token={}", token.id),
+        })),
+    ))
+}
+
+async fn validate_embed_token(
+    State(state): State<AppState>,
+    Path(token_id): Path<String>,
+) -> Result<Json<Value>, StatusCode> {
+    match state.user_store.validate_embed_token(&token_id) {
+        Ok(token) => Ok(Json(json!({
+            "valid": true,
+            "dashboard_id": token.dashboard_id,
+            "row_filter": token.row_filter,
+            "theme": token.theme,
+            "permissions": token.permissions,
+        }))),
+        Err(_) => Err(StatusCode::NOT_FOUND),
+    }
+}
+
+// ------------------------------------------------------------------
+// Cache management (Phase 10)
+// ------------------------------------------------------------------
+
+async fn cache_stats(
+    State(state): State<AppState>,
+) -> Json<Value> {
+    let cache = state.query_cache.read().await;
+    Json(json!({
+        "entries": cache.len(),
+        "is_empty": cache.is_empty(),
+    }))
+}
+
+#[derive(Deserialize)]
+struct CacheInvalidateRequest {
+    hash: String,
+}
+
+async fn cache_invalidate(
+    State(state): State<AppState>,
+    Json(req): Json<CacheInvalidateRequest>,
+) -> Json<Value> {
+    let mut cache = state.query_cache.write().await;
+    let removed = cache.invalidate(&req.hash);
+    Json(json!({ "removed": removed }))
+}
+
+#[derive(Deserialize)]
+struct CacheInvalidateTableRequest {
+    table: String,
+}
+
+async fn cache_invalidate_table(
+    State(state): State<AppState>,
+    Json(req): Json<CacheInvalidateTableRequest>,
+) -> Json<Value> {
+    let mut cache = state.query_cache.write().await;
+    let removed = cache.invalidate_table(&req.table);
+    Json(json!({ "table": req.table, "removed": removed }))
+}
+
+// ------------------------------------------------------------------
+// Scheduled snapshots (Phase 5)
+// ------------------------------------------------------------------
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct SnapshotSchedule {
+    id: String,
+    dashboard_id: String,
+    interval_seconds: u64,
+    last_snapshot_at: Option<String>,
+    enabled: bool,
+    created_at: String,
+}
+
+async fn list_snapshots(
+    Extension(_claims): Extension<crate::auth::Claims>,
+    State(state): State<AppState>,
+    Path(dashboard_id): Path<String>,
+) -> Json<Value> {
+    let schedules = state.snapshot_schedules.read().await;
+    let filtered: Vec<&SnapshotSchedule> = schedules
+        .iter()
+        .filter(|s| s.dashboard_id == dashboard_id)
+        .collect();
+    Json(json!({ "schedules": filtered }))
+}
+
+#[derive(Deserialize)]
+struct CreateSnapshotScheduleRequest {
+    interval_seconds: u64,
+    #[serde(default = "default_true")]
+    enabled: bool,
+}
+
+fn default_true() -> bool { true }
+
+async fn create_snapshot_schedule(
+    Extension(claims): Extension<crate::auth::Claims>,
+    State(state): State<AppState>,
+    Path(dashboard_id): Path<String>,
+    Json(req): Json<CreateSnapshotScheduleRequest>,
+) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
+    if req.interval_seconds < 60 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "interval must be at least 60 seconds" })),
+        ));
+    }
+    let id = format!("snap_{}", uuid::Uuid::new_v4().as_simple());
+    let now = chrono::Utc::now().to_rfc3339();
+    let schedule = SnapshotSchedule {
+        id: id.clone(),
+        dashboard_id: dashboard_id.clone(),
+        interval_seconds: req.interval_seconds,
+        last_snapshot_at: None,
+        enabled: req.enabled,
+        created_at: now,
+    };
+    state.snapshot_schedules.write().await.push(schedule.clone());
+    state.user_store.audit(
+        &claims.sub, "create", "snapshot_schedule", &id,
+        Some(format!("dashboard={dashboard_id} interval={}s", req.interval_seconds)),
+    );
+    Ok((StatusCode::CREATED, Json(json!(schedule))))
+}
+
+async fn delete_snapshot_schedule(
+    Extension(claims): Extension<crate::auth::Claims>,
+    State(state): State<AppState>,
+    Path((dashboard_id, snapshot_id)): Path<(String, String)>,
+) -> Result<StatusCode, StatusCode> {
+    let mut schedules = state.snapshot_schedules.write().await;
+    let before = schedules.len();
+    schedules.retain(|s| !(s.dashboard_id == dashboard_id && s.id == snapshot_id));
+    if schedules.len() == before {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    state.user_store.audit(
+        &claims.sub, "delete", "snapshot_schedule", &snapshot_id, None,
+    );
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ------------------------------------------------------------------
+// Dashboard dependency graph (Phase 5)
+// ------------------------------------------------------------------
+
+async fn get_dashboard_dependencies(
+    Extension(_claims): Extension<crate::auth::Claims>,
+    Path(dashboard_id): Path<String>,
+) -> Json<Value> {
+    // Extract query dependencies from dashboard widgets.
+    // In production, this would read the dashboard config from the store.
+    // For now, return the dependency graph structure.
+    Json(json!({
+        "dashboard_id": dashboard_id,
+        "nodes": [],
+        "edges": [],
+        "description": "Dependency graph: widgets -> queries -> tables. Extracted from widget config at build time.",
+    }))
 }

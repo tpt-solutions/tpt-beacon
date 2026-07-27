@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
 /**
  * AI layer API client — NL-to-query, suggestions, explanations.
  * Gracefully returns null/empty when Anvil is unavailable (503).
